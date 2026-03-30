@@ -1,0 +1,62 @@
+services:
+  # ─── Shared LLM Server (used by all agents) ───────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Pull llama3.2 on first start, then exit
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["ollama", "pull", "llama3.2"]
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+
+  # ─── Zeal Jira Agent (API mode) ───────────────────────────────
+  zeal-jira-agent:
+    build:
+      context: .
+      dockerfile: zeal-jira-agent/Dockerfile
+    container_name: zeal-jira-agent
+    restart: unless-stopped
+    ports:
+      - "20000:8000"
+    env_file:
+      - zeal-jira-agent/.env
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - jira_memory:/app/memory
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  ollama_data:
+  jira_memory:
