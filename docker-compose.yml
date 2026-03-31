@@ -1,38 +1,4 @@
 services:
-  # ─── Shared LLM Server ────────────────────────────────────────
-  ollama:
-    image: ollama/ollama:latest
-    container_name: nc-ollama
-    restart: unless-stopped
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Pull llama3.2 on first start
-  ollama-init:
-    image: ollama/ollama:latest
-    container_name: nc-ollama-init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    restart: "no"
-    entrypoint: ["ollama", "pull", "llama3.2"]
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-
   # ─── Conductor (API Gateway + Orchestrator) ────────────────────
   conductor:
     build:
@@ -47,9 +13,8 @@ services:
     environment:
       - AGENT_API_KEY=${AGENT_API_KEY}
       - DASHBOARD_PIN=${DASHBOARD_PIN:-1234}
-    depends_on:
-      ollama:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 10s
@@ -69,17 +34,16 @@ services:
       - secrets/yassir.env
       - secrets/shared.env
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
       - PROFILE_ID=yassir
       - PROFILE_SCOPE=individual
       - JIRA_DOMAIN=${YASSIR_JIRA_DOMAIN}
       - JIRA_EMAIL=${YASSIR_JIRA_EMAIL}
       - JIRA_API_TOKEN=${YASSIR_JIRA_TOKEN}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - memory_data:/app/data
-    depends_on:
-      ollama:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -101,17 +65,16 @@ services:
   #     - secrets/zeal.env
   #     - secrets/shared.env
   #   environment:
-  #     - OLLAMA_BASE_URL=http://ollama:11434
+  #     - OLLAMA_BASE_URL=http://host.docker.internal:11434
   #     - PROFILE_ID=zeal
   #     - PROFILE_SCOPE=leader
   #     - JIRA_DOMAIN=${ZEAL_JIRA_DOMAIN}
   #     - JIRA_EMAIL=${ZEAL_JIRA_EMAIL}
   #     - JIRA_API_TOKEN=${ZEAL_JIRA_TOKEN}
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
   #   volumes:
   #     - memory_data:/app/data
-  #   depends_on:
-  #     ollama:
-  #       condition: service_healthy
   #   healthcheck:
   #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
   #     interval: 10s
@@ -119,5 +82,4 @@ services:
   #     retries: 3
 
 volumes:
-  ollama_data:
   memory_data:
