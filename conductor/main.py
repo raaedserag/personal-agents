@@ -271,11 +271,15 @@ def get_briefing(briefing_type: str, profile_id: str = Query(default="")):
         return _aggregate_blockers(profile_id)
     elif briefing_type == "tickets":
         return _aggregate_tickets(profile_id)
+    elif briefing_type == "prs":
+        return _aggregate_prs(profile_id)
+    elif briefing_type == "morning":
+        return _aggregate_morning(profile_id)
     else:
         return QueryResponse(
             status="unsupported",
             error=f"Briefing type '{briefing_type}' not yet implemented. "
-                  f"Available: blockers, tickets. (morning, eod coming in Phase 2 with planner agent)",
+                  f"Available: blockers, tickets, prs, morning.",
         )
 
 
@@ -311,6 +315,75 @@ def _aggregate_tickets(profile_id: str = "") -> dict:
             all_tickets[agent_id] = result
 
     return {"status": "ok", "briefing_type": "tickets", "data": all_tickets}
+
+
+def _aggregate_prs(profile_id: str = "") -> dict:
+    """Aggregate PR digests from all github agents."""
+    all_prs: dict[str, Any] = {}
+
+    if profile_id:
+        agents = [(f"github-{profile_id}", registry.get(f"github-{profile_id}"))]
+    else:
+        agents = registry.get_by_type("github")
+
+    for agent_id, client in agents:
+        if client:
+            result = client.get_pr_digest()
+            all_prs[agent_id] = result
+
+    return {"status": "ok", "briefing_type": "prs", "data": all_prs}
+
+
+def _aggregate_morning(profile_id: str = "") -> dict:
+    """Aggregate a morning briefing from all available agents.
+
+    Combines tickets + blockers + PR digest into one report.
+    In Phase 2 the planner agent will synthesize this with an LLM.
+    """
+    sections: dict[str, Any] = {}
+
+    # Tickets from Jira agents
+    if profile_id:
+        jira_agents = [(f"jira-{profile_id}", registry.get(f"jira-{profile_id}"))]
+    else:
+        jira_agents = registry.get_by_type("jira")
+
+    jira_data: dict[str, Any] = {}
+    for agent_id, client in jira_agents:
+        if client:
+            jira_data[agent_id] = {
+                "standup": client.get_standup_data(),
+                "blocked": client.get_blocked_tickets(),
+            }
+    sections["jira"] = jira_data
+
+    # PRs from GitHub agents
+    if profile_id:
+        gh_agents = [(f"github-{profile_id}", registry.get(f"github-{profile_id}"))]
+    else:
+        gh_agents = registry.get_by_type("github")
+
+    gh_data: dict[str, Any] = {}
+    for agent_id, client in gh_agents:
+        if client:
+            gh_data[agent_id] = client.get_pr_digest()
+    sections["github"] = gh_data
+
+    # Infra (if available)
+    infra_agents = registry.get_by_type("infra")
+    if infra_agents:
+        infra_data: dict[str, Any] = {}
+        for agent_id, client in infra_agents:
+            if client:
+                infra_data[agent_id] = client.get("/status")
+        sections["infra"] = infra_data
+
+    return {
+        "status": "ok",
+        "briefing_type": "morning",
+        "generated_at": datetime.utcnow().isoformat(),
+        "data": sections,
+    }
 
 
 if __name__ == "__main__":

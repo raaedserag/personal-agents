@@ -1,0 +1,27 @@
+spec_version: "0.2.0"
+name: nerve-github-agent
+version: 1.0.0
+description: >
+  GitHub agent for the Nerve Center platform.
+  Monitors PRs, CI status, and code review quality.
+  Behavior adapts based on the loaded job profile's scope (leader vs individual).
+
+model:
+  default:
+    provider: ollama
+    name: llama3.2
+    base_url: http://ollama:11434
+  heavy:
+    provider: anthropic
+    name: claude-sonnet-4-20250514
+
+skills:
+  - github_fetcher
+  - pr_summarizer
+
+secrets:
+  - GITHUB_TOKEN
+  - GITHUB_ORG
+  - GITHUB_USERNAME
+  - AGENT_API_KEY
+  - ANTHROPIC_API_KEY  # for PR summarization

@@ -277,13 +277,146 @@ def _render_standup(data: dict, profile: str):
             console.print(f"  [yellow]●[/yellow] [{t['key']}] {t['summary'][:60]} — {t['assignee']}")
 
 
+# ── PRs ─────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option("--job", "-j", default="", help="Filter by job profile")
+@click.option("--mine", is_flag=True, help="Show only your PRs")
+@click.option("--review", is_flag=True, help="Show PRs needing your review")
+@click.option("--stale", is_flag=True, help="Show stale PRs")
+def prs(job: str, mine: bool, review: bool, stale: bool):
+    """Show open pull requests."""
+    if stale:
+        data = _request("POST", "/query", json={
+            "query": "stale prs",
+            "profile_id": job,
+        })
+    elif mine:
+        data = _request("POST", "/query", json={
+            "query": "my pull requests",
+            "profile_id": job,
+        })
+    elif review:
+        data = _request("POST", "/query", json={
+            "query": "prs needing my review",
+            "profile_id": job,
+        })
+    else:
+        data = _request("POST", "/query", json={
+            "query": "open pull requests",
+            "profile_id": job,
+        })
+
+    results = data.get("results", {})
+    if not results:
+        error = data.get("error", "No GitHub agents available.")
+        console.print(f"[yellow]{error}[/yellow]")
+        return
+
+    for agent_id, result in results.items():
+        profile = agent_id.replace("github-", "")
+        console.print(f"\n[bold cyan]── PRs: {profile.upper()} ──[/bold cyan]")
+        if isinstance(result, dict):
+            content = result.get("data", "")
+            if isinstance(content, str):
+                console.print(content)
+            elif isinstance(content, list):
+                _render_pr_list(content)
+            else:
+                console.print(str(content))
+        else:
+            console.print(str(result))
+
+
+def _render_pr_list(prs_data: list):
+    """Render a list of PRs as a table."""
+    if not prs_data:
+        console.print("[dim]No PRs found.[/dim]")
+        return
+
+    table = Table(title=f"Pull Requests ({len(prs_data)})")
+    table.add_column("Repo", style="dim")
+    table.add_column("#", style="cyan", justify="right")
+    table.add_column("Title")
+    table.add_column("Author", style="magenta")
+    table.add_column("Status")
+    table.add_column("CI")
+    table.add_column("Reviewers", style="dim")
+
+    for pr in prs_data:
+        repo = pr.get("repo", "").split("/")[-1] if "/" in pr.get("repo", "") else pr.get("repo", "")
+        status = pr.get("status", "?")
+        ci = pr.get("ci_status", "?")
+
+        status_style = {"open": "green", "draft": "yellow", "merged": "magenta", "closed": "red"}.get(status, "")
+        ci_style = {"success": "green", "passing": "green", "failure": "red", "failing": "red", "pending": "yellow"}.get(ci, "dim")
+
+        reviewers = ", ".join(pr.get("reviewers", [])) or "-"
+
+        table.add_row(
+            repo,
+            str(pr.get("number", "")),
+            pr.get("title", "")[:50],
+            pr.get("author", ""),
+            f"[{status_style}]{status}[/{status_style}]" if status_style else status,
+            f"[{ci_style}]{ci}[/{ci_style}]" if ci_style else ci,
+            reviewers[:30],
+        )
+
+    console.print(table)
+
+
+@cli.command(name="pr-digest")
+@click.option("--job", "-j", default="", help="Filter by job profile")
+def pr_digest(job: str):
+    """Show PR digest (summary across all repos)."""
+    params = {"profile_id": job} if job else {}
+    data = _request("GET", "/briefing/prs", params=params)
+    pr_data = data.get("data", {})
+
+    if not pr_data:
+        console.print("[yellow]No PR digest data.[/yellow]")
+        return
+
+    for agent_id, result in pr_data.items():
+        profile = agent_id.replace("github-", "")
+        console.print(f"\n[bold cyan]── PR Digest: {profile.upper()} ──[/bold cyan]")
+
+        if isinstance(result, dict) and result.get("status") == "ok":
+            digest = result.get("data", {})
+            my_prs = digest.get("my_prs", [])
+            review_req = digest.get("review_requested", [])
+            stale = digest.get("stale_prs", [])
+            total = len(digest.get("open_prs", []))
+
+            console.print(f"  Total open PRs: [bold]{total}[/bold]")
+
+            if my_prs:
+                console.print(f"\n  [green]Your PRs ({len(my_prs)}):[/green]")
+                for pr in my_prs:
+                    ci = pr.get("ci_status", "?")
+                    console.print(f"    [{pr['repo']}#{pr['number']}] {pr['title'][:50]} (CI: {ci})")
+
+            if review_req:
+                console.print(f"\n  [yellow]Review Requested ({len(review_req)}):[/yellow]")
+                for pr in review_req:
+                    console.print(f"    [{pr['repo']}#{pr['number']}] {pr['title'][:50]} by {pr['author']}")
+
+            if stale:
+                console.print(f"\n  [red]Stale ({len(stale)}):[/red]")
+                for pr in stale:
+                    console.print(f"    [{pr['repo']}#{pr['number']}] {pr['title'][:50]} — {pr['updated_at'][:10]}")
+        elif isinstance(result, dict) and "error" in result:
+            console.print(f"[red]Error: {result['error']}[/red]")
+
+
 # ── Briefing ─────────────────────────────────────────────────────
 
 @cli.command()
-@click.argument("briefing_type", type=click.Choice(["blockers", "tickets"]))
+@click.argument("briefing_type", type=click.Choice(["blockers", "tickets", "prs", "morning"]))
 @click.option("--job", "-j", default="", help="Filter by job profile")
 def briefing(briefing_type: str, job: str):
-    """Trigger a briefing (blockers, tickets)."""
+    """Trigger a briefing (blockers, tickets, prs, morning)."""
     params = {"profile_id": job} if job else {}
     data = _request("GET", f"/briefing/{briefing_type}", params=params)
     console.print(Panel(

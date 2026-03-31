@@ -50,6 +50,68 @@ services:
       timeout: 5s
       retries: 3
 
+  # ─── GitHub Agent: Yassir (IC scope) ──────────────────────────
+  github-yassir:
+    build:
+      context: .
+      dockerfile: agents/github-agent/Dockerfile
+    container_name: nc-github-yassir
+    restart: unless-stopped
+    ports:
+      - "20011:8000"
+    env_file:
+      - secrets/yassir.env
+      - secrets/shared.env
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - PROFILE_ID=yassir
+      - PROFILE_SCOPE=individual
+      - GITHUB_TOKEN=${YASSIR_GITHUB_TOKEN}
+      - GITHUB_ORG=${YASSIR_GITHUB_ORG}
+      - GITHUB_USERNAME=${YASSIR_GITHUB_USERNAME}
+      - GITHUB_REPOS=${YASSIR_GITHUB_REPOS:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - memory_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── GitHub Agent: Zeal (Leader scope) ────────────────────────
+  # Uncomment when ready to add Zeal GitHub:
+  #
+  # github-zeal:
+  #   build:
+  #     context: .
+  #     dockerfile: agents/github-agent/Dockerfile
+  #   container_name: nc-github-zeal
+  #   restart: unless-stopped
+  #   ports:
+  #     - "20010:8000"
+  #   env_file:
+  #     - secrets/zeal.env
+  #     - secrets/shared.env
+  #   environment:
+  #     - OLLAMA_BASE_URL=http://host.docker.internal:11434
+  #     - PROFILE_ID=zeal
+  #     - PROFILE_SCOPE=leader
+  #     - GITHUB_TOKEN=${ZEAL_GITHUB_TOKEN}
+  #     - GITHUB_ORG=${ZEAL_GITHUB_ORG}
+  #     - GITHUB_USERNAME=${ZEAL_GITHUB_USERNAME}
+  #     - GITHUB_REPOS=${ZEAL_GITHUB_REPOS:-}
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   volumes:
+  #     - memory_data:/app/data
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+
   # ─── Jira Agent: Zeal (Leader scope) ──────────────────────────
   # Uncomment when ready to add Zeal:
   #
