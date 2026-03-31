@@ -1,0 +1,2 @@
+TOOL_REGISTRY = {}
+WRITE_TOOLS = set()

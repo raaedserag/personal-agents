@@ -1,0 +1,19 @@
+spec_version: "0.2.0"
+name: AGENT_NAME
+version: 1.0.0
+description: "Nerve Center agent — AGENT_NAME"
+
+model:
+  default:
+    provider: ollama
+    name: llama3.2
+    base_url: http://ollama:11434
+  heavy:
+    provider: anthropic
+    name: claude-sonnet-4-20250514
+
+skills: []
+
+secrets:
+  - AGENT_API_KEY
+  - ANTHROPIC_API_KEY

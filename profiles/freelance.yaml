@@ -1,0 +1,9 @@
+profile_id: freelance
+label: "Freelance Projects"
+role: "Consultant / Contractor"
+scope: "individual"
+
+integrations:
+  github:
+    token: "${FREELANCE_GITHUB_TOKEN}"
+    repos: []                            # Add per-client repos as needed

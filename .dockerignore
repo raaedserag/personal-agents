@@ -1,9 +1,0 @@
-.venv/
-__pycache__/
-*.pyc
-.env
-memory/summaries/
-memory/logs/
-.git/
-.gitignore
-*.md

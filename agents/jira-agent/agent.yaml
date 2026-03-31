@@ -1,0 +1,25 @@
+spec_version: "0.2.0"
+name: nerve-jira-agent
+version: 2.0.0
+description: >
+  Generalized Jira agent for the Nerve Center platform.
+  Behavior adapts based on the loaded job profile's scope (leader vs individual).
+
+model:
+  default:
+    provider: ollama
+    name: llama3.2
+    base_url: http://ollama:11434
+  heavy:
+    provider: anthropic
+    name: claude-sonnet-4-20250514
+
+skills:
+  - jira_fetcher
+
+secrets:
+  - JIRA_API_TOKEN
+  - JIRA_EMAIL
+  - JIRA_DOMAIN
+  - AGENT_API_KEY
+  - ANTHROPIC_API_KEY  # for heavy tasks (summaries, analysis)

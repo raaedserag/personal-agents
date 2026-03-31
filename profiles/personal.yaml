@@ -1,0 +1,11 @@
+profile_id: personal
+label: "Personal"
+scope: "personal"
+
+integrations:
+  calendar:
+    provider: "google"
+    calendar_id: "primary"
+  email:
+    provider: "gmail"
+    address: "${PERSONAL_EMAIL}"

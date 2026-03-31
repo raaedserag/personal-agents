@@ -2,10 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY zeal-jira-agent/requirements.txt .
+COPY shared/ /app/shared/
+
+COPY agents/AGENT_NAME/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY zeal-jira-agent/ .
+COPY agents/AGENT_NAME/ /app/
+
+RUN mkdir -p /app/data
 
 EXPOSE 8000
 

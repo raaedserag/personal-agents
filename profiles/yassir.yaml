@@ -1,0 +1,32 @@
+profile_id: yassir
+label: "Yassir — Software Engineer"
+role: "Software Engineer (IC)"
+scope: "individual"
+
+integrations:
+  jira:
+    domain: "${YASSIR_JIRA_DOMAIN}"
+    email: "${YASSIR_JIRA_EMAIL}"
+    api_token: "${YASSIR_JIRA_TOKEN}"
+    projects: []                         # TODO: fill in your Yassir project keys
+
+  github:
+    org: "${YASSIR_GITHUB_ORG}"          # TODO: replace with actual org
+    token: "${YASSIR_GITHUB_TOKEN}"
+    repos: []                            # empty = all repos in org
+
+  slack:
+    workspace: "${YASSIR_SLACK_WORKSPACE}"
+    bot_token: "${YASSIR_SLACK_BOT_TOKEN}"
+
+  gcp:
+    project_id: "${YASSIR_GCP_PROJECT}"
+    services: [gke]
+
+  # Optional — uncomment when needed:
+  # mongodb:
+  #   uri: "${YASSIR_MONGO_URI}"
+  # datadog:
+  #   api_key: "${YASSIR_DATADOG_API_KEY}"
+  # notion:
+  #   token: "${YASSIR_NOTION_TOKEN}"

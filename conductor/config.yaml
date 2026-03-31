@@ -1,0 +1,58 @@
+agents:
+  - id: jira-yassir
+    type: jira
+    profile: yassir
+    url: http://jira-yassir:8000
+    port: 20001
+
+  # Uncomment as you add more agents:
+  # - id: jira-zeal
+  #   type: jira
+  #   profile: zeal
+  #   url: http://jira-zeal:8000
+  #   port: 20000
+  #
+  # - id: github-yassir
+  #   type: github
+  #   profile: yassir
+  #   url: http://github-yassir:8000
+  #   port: 20011
+  #
+  # - id: github-zeal
+  #   type: github
+  #   profile: zeal
+  #   url: http://github-zeal:8000
+  #   port: 20010
+  #
+  # - id: planner
+  #   type: planner
+  #   profile: global
+  #   url: http://planner:8000
+  #   port: 20020
+  #
+  # - id: infra-zeal
+  #   type: infra
+  #   profile: zeal
+  #   url: http://infra-zeal:8000
+  #   port: 20040
+
+schedules:
+  morning_briefing:
+    cron: "0 7 * * 1-5"
+    action: planner.morning_briefing
+    deliver_to: [dashboard]
+
+  blocker_check:
+    cron: "0 */3 * * 1-5"
+    action: planner.blocker_alert
+    deliver_to: [dashboard]
+
+  pr_digest:
+    cron: "0 9,14 * * 1-5"
+    action: planner.pr_digest
+    deliver_to: [dashboard]
+
+  eod_summary:
+    cron: "0 18 * * 1-5"
+    action: planner.eod_summary
+    deliver_to: [dashboard]

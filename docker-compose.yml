@@ -1,8 +1,8 @@
 services:
-  # ─── Shared LLM Server (used by all agents) ───────────────────
+  # ─── Shared LLM Server ────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
-    container_name: ollama
+    container_name: nc-ollama
     restart: unless-stopped
     ports:
       - "11434:11434"
@@ -21,10 +21,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # Pull llama3.2 on first start, then exit
+  # Pull llama3.2 on first start
   ollama-init:
     image: ollama/ollama:latest
-    container_name: ollama-init
+    container_name: nc-ollama-init
     depends_on:
       ollama:
         condition: service_healthy
@@ -33,21 +33,50 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
 
-  # ─── Zeal Jira Agent (API mode) ───────────────────────────────
-  zeal-jira-agent:
+  # ─── Conductor (API Gateway + Orchestrator) ────────────────────
+  conductor:
     build:
       context: .
-      dockerfile: zeal-jira-agent/Dockerfile
-    container_name: zeal-jira-agent
+      dockerfile: conductor/Dockerfile
+    container_name: nc-conductor
     restart: unless-stopped
     ports:
-      - "20000:8000"
+      - "9000:9000"
     env_file:
-      - zeal-jira-agent/.env
+      - secrets/shared.env
+    environment:
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - DASHBOARD_PIN=${DASHBOARD_PIN:-1234}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── Jira Agent: Yassir (IC scope) ────────────────────────────
+  jira-yassir:
+    build:
+      context: .
+      dockerfile: agents/jira-agent/Dockerfile
+    container_name: nc-jira-yassir
+    restart: unless-stopped
+    ports:
+      - "20001:8000"
+    env_file:
+      - secrets/yassir.env
+      - secrets/shared.env
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - PROFILE_ID=yassir
+      - PROFILE_SCOPE=individual
+      - JIRA_DOMAIN=${YASSIR_JIRA_DOMAIN}
+      - JIRA_EMAIL=${YASSIR_JIRA_EMAIL}
+      - JIRA_API_TOKEN=${YASSIR_JIRA_TOKEN}
     volumes:
-      - jira_memory:/app/memory
+      - memory_data:/app/data
     depends_on:
       ollama:
         condition: service_healthy
@@ -57,6 +86,38 @@ services:
       timeout: 5s
       retries: 3
 
+  # ─── Jira Agent: Zeal (Leader scope) ──────────────────────────
+  # Uncomment when ready to add Zeal:
+  #
+  # jira-zeal:
+  #   build:
+  #     context: .
+  #     dockerfile: agents/jira-agent/Dockerfile
+  #   container_name: nc-jira-zeal
+  #   restart: unless-stopped
+  #   ports:
+  #     - "20000:8000"
+  #   env_file:
+  #     - secrets/zeal.env
+  #     - secrets/shared.env
+  #   environment:
+  #     - OLLAMA_BASE_URL=http://ollama:11434
+  #     - PROFILE_ID=zeal
+  #     - PROFILE_SCOPE=leader
+  #     - JIRA_DOMAIN=${ZEAL_JIRA_DOMAIN}
+  #     - JIRA_EMAIL=${ZEAL_JIRA_EMAIL}
+  #     - JIRA_API_TOKEN=${ZEAL_JIRA_TOKEN}
+  #   volumes:
+  #     - memory_data:/app/data
+  #   depends_on:
+  #     ollama:
+  #       condition: service_healthy
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+
 volumes:
   ollama_data:
-  jira_memory:
+  memory_data:

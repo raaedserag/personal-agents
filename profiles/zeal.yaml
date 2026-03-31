@@ -1,0 +1,55 @@
+profile_id: zeal
+label: "Zeal — Cloud/Platform/SRE Lead"
+role: "Cloud Team Lead / DevOps / SRE"
+scope: "leader"
+apps_maintained: 50+
+
+team_members:
+  # TODO: fill in your actual team members
+  - name: "Member 1"
+    email: "member1@getzeal.io"
+    role: "backend"
+  - name: "Member 2"
+    email: "member2@getzeal.io"
+    role: "backend"
+  - name: "Member 3"
+    email: "member3@getzeal.io"
+    role: "frontend"
+  - name: "Member 4"
+    email: "member4@getzeal.io"
+    role: "devops"
+
+integrations:
+  jira:
+    domain: "${ZEAL_JIRA_DOMAIN}"
+    email: "${ZEAL_JIRA_EMAIL}"
+    api_token: "${ZEAL_JIRA_TOKEN}"
+    projects: [ATH, ATHSP, ATL, ATLSP, HRM, HRMSP, APL, APLSP, CL]
+
+  github:
+    org: "${ZEAL_GITHUB_ORG}"
+    token: "${ZEAL_GITHUB_TOKEN}"
+    repos: []
+
+  slack:
+    workspace: "${ZEAL_SLACK_WORKSPACE}"
+    bot_token: "${ZEAL_SLACK_BOT_TOKEN}"
+
+  pagerduty:
+    api_key: "${ZEAL_PD_API_KEY}"
+    service_ids: []                      # TODO: fill in monitored service IDs
+
+  aws:
+    region: "${ZEAL_AWS_REGION}"
+    services: [ecs, elasticsearch, grafana]
+
+  grafana:
+    url: "${ZEAL_GRAFANA_URL}"
+    api_key: "${ZEAL_GRAFANA_API_KEY}"
+
+  google_workspace:
+    enabled: true
+
+  calendar:
+    provider: "google"
+    calendar_id: "primary"
