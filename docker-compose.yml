@@ -7,7 +7,7 @@ services:
     container_name: nc-conductor
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "10000:10000"
     env_file:
       - secrets/shared.env
     environment:
@@ -16,7 +16,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
       interval: 10s
       timeout: 5s
       retries: 3

@@ -128,7 +128,7 @@ integrations:
 │         └──────────┬─────────────────┘                        │
 │                    ▼                                           │
 │  ┌──────────────────────────────────┐                         │
-│  │          CONDUCTOR               │  Port 9000              │
+│  │          CONDUCTOR               │  Port 10000              │
 │  │  - API gateway / router          │                         │
 │  │  - Scheduled jobs (cron)         │                         │
 │  │  - Agent registry                │                         │

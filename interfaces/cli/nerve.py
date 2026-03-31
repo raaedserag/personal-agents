@@ -34,7 +34,7 @@ from rich.markdown import Markdown
 
 console = Console()
 
-CONDUCTOR_URL = os.getenv("NERVE_CONDUCTOR_URL", "http://localhost:9000")
+CONDUCTOR_URL = os.getenv("NERVE_CONDUCTOR_URL", "http://localhost:10000")
 
 
 def _request(method: str, path: str, **kwargs) -> dict:
