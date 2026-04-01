@@ -310,7 +310,7 @@ def get_briefing(briefing_type: str, profile_id: str = Query(default="")):
     if briefing_type == "blockers":
         return _aggregate_blockers(profile_id)
     elif briefing_type == "tickets":
-        return _aggregate_tickets(profile_id)
+        return _aggregate_standup(profile_id)
     elif briefing_type == "prs":
         return _aggregate_prs(profile_id)
     elif briefing_type == "morning":
@@ -340,9 +340,9 @@ def _aggregate_blockers(profile_id: str = "") -> dict:
     return {"status": "ok", "briefing_type": "blockers", "data": all_blockers}
 
 
-def _aggregate_tickets(profile_id: str = "") -> dict:
-    """Aggregate open tickets from all jira agents."""
-    all_tickets: dict[str, Any] = {}
+def _aggregate_standup(profile_id: str = "") -> dict:
+    """Aggregate structured standup data from all jira agents."""
+    all_standup: dict[str, Any] = {}
 
     if profile_id:
         agents = [(f"jira-{profile_id}", registry.get(f"jira-{profile_id}"))]
@@ -351,10 +351,10 @@ def _aggregate_tickets(profile_id: str = "") -> dict:
 
     for agent_id, client in agents:
         if client:
-            result = client.get_my_tickets()
-            all_tickets[agent_id] = result
+            result = client.get_standup_data()
+            all_standup[agent_id] = result
 
-    return {"status": "ok", "briefing_type": "tickets", "data": all_tickets}
+    return {"status": "ok", "briefing_type": "tickets", "data": all_standup}
 
 
 def _aggregate_prs(profile_id: str = "") -> dict:

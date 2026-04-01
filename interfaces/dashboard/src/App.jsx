@@ -4,6 +4,7 @@ import JobTabs from "./components/JobTabs";
 import BriefingPanel from "./components/BriefingPanel";
 import TicketList from "./components/TicketList";
 import PRDigest from "./components/PRDigest";
+import TicketSummary from "./components/TicketSummary";
 import BlockerAlerts from "./components/BlockerAlerts";
 import AgentHealth from "./components/AgentHealth";
 import QueryBar from "./components/QueryBar";
@@ -54,6 +55,7 @@ export default function App() {
           </div>
           <div className="grid-col-side">
             <BlockerAlerts profileId={activeProfile} />
+            <TicketSummary profileId={activeProfile} />
             <PRDigest profileId={activeProfile} />
             <AgentHealth />
           </div>

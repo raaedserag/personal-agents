@@ -54,9 +54,10 @@ export default function TicketList({ profileId }) {
 function extractTickets(data) {
   if (!data?.data) return [];
   const tickets = [];
+  // data shape: { status: "ok", data: { "jira-yassir": { status, data: { my_tickets, ... } } } }
   for (const [, agentResult] of Object.entries(data.data)) {
     const inner = agentResult?.data;
-    if (typeof inner === "object" && inner?.my_tickets) {
+    if (typeof inner === "object" && Array.isArray(inner?.my_tickets)) {
       tickets.push(...inner.my_tickets);
     }
   }

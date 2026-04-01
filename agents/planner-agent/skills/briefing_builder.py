@@ -92,69 +92,62 @@ def _collect_infra_data(registry: AgentRegistry) -> dict:
 
 # ── Briefing Synthesis ──────────────────────────────────────────
 
-MORNING_SYSTEM_PROMPT = """You are a concise operations briefing generator. Given raw data from multiple agents (Jira tickets, GitHub PRs, infrastructure status), produce a well-structured morning briefing.
+MORNING_SYSTEM_PROMPT = """You generate morning briefings from raw agent data. Output valid markdown.
 
-Format the briefing in markdown with these sections (skip sections with no data):
+Use these sections (skip empty ones):
 
 ## Blockers & Incidents
-List any blocked tickets or active incidents. These are highest priority.
+- List each blocker as: **[TICKET-KEY]** Summary — assigned to: Name (Priority)
 
 ## Your Tickets Today
-Table with columns: Job | Key | Summary | Status | Priority
-Show tickets across all job profiles.
+- List each ticket as: **[TICKET-KEY]** Summary — Status, Priority
+- Group by job profile if multiple profiles have data
 
-## Infra Health (if data available)
-Brief summary of infrastructure status.
+## Infra Health
+- Brief bullet points about infrastructure status
 
 ## PRs Needing Attention
-List PRs: your open PRs, PRs awaiting your review, stale PRs.
+- List each PR as: **repo#number** Title — by Author (CI: status)
 
 ## Suggested Focus Order
-Numbered list of 3-5 items prioritized by impact and urgency.
+1. Most urgent items first (blockers, then high priority, then reviews)
 
 Rules:
-- Be concise — no filler text
-- Prioritize blockers and incidents first
-- If a ticket has been in progress for 3+ days, flag it
-- If a PR has been waiting for review for 2+ days, flag it
-- Use the actual data provided — never fabricate ticket IDs or PR numbers"""
+- Use bullet lists, NOT tables
+- Be concise, no filler
+- Use the actual data provided, never fabricate IDs
+- Bold the ticket keys and PR numbers for readability"""
 
 
-EOD_SYSTEM_PROMPT = """You are a concise end-of-day summary generator. Given raw data about the current state of tickets and PRs, produce an EOD summary.
+EOD_SYSTEM_PROMPT = """You generate end-of-day summaries from raw agent data. Output valid markdown.
 
-Format in markdown with these sections (skip sections with no data):
-
-## Completed Today
-List tickets that are now Done/Resolved.
+Use these sections (skip empty ones):
 
 ## Still In Progress
-Tickets actively being worked on — note anything that's been lingering.
+- List tickets still being worked on as bullet points
 
 ## Blockers Carried Over
-Any blockers that weren't resolved today.
+- Any blockers that weren't resolved
 
 ## PRs Status
-Open PRs, merged PRs, pending reviews.
+- Open PRs, pending reviews
 
 ## Tomorrow's Priorities
-2-3 suggested priorities based on the current state.
+1. Top 2-3 items to focus on next
 
 Rules:
+- Use bullet lists, NOT tables
 - Be brief and actionable
-- Compare current state to flag what likely changed today
 - Never fabricate data"""
 
 
-BLOCKER_SYSTEM_PROMPT = """You are a blocker alert generator. Given raw data about blocked tickets and incidents, produce a concise alert.
+BLOCKER_SYSTEM_PROMPT = """List blockers from the raw data. Output valid markdown.
 
-Format as a numbered list of blockers, each with:
-- Ticket/incident ID
-- Brief description
-- Who is affected / assigned
-- How long it's been blocked (if data available)
+Format each as:
+- **[TICKET-KEY]** Description — Assignee (Priority)
 
-If there are no blockers, say "No active blockers." and nothing else.
-Be extremely concise — this is an alert, not a report."""
+If there are no blockers, say "No active blockers." only.
+Be extremely concise."""
 
 
 def build_morning_briefing() -> dict:
