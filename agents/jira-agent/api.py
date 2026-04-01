@@ -13,6 +13,7 @@ import sys
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, Query
+from pydantic import BaseModel
 
 # Add shared package to path
 sys.path.insert(0, "/app")
@@ -29,6 +30,10 @@ from skills.jira_fetcher import (
     get_stale_tickets,
     search_tickets,
     get_team_open_tickets,
+    transition_ticket,
+    add_comment,
+    assign_ticket,
+    create_ticket,
 )
 
 load_dotenv()
@@ -130,6 +135,55 @@ def standup_data(_key: str = Depends(verify_api_key)):
         status="ok", agent_id=AGENT_ID,
         data=standup.model_dump(),
     )
+
+
+# ── Write Endpoints ──────────────────────────────────────────────
+
+class TransitionRequest(BaseModel):
+    issue_key: str
+    target_status: str
+
+class CommentRequest(BaseModel):
+    issue_key: str
+    comment_body: str
+
+class AssignRequest(BaseModel):
+    issue_key: str
+    assignee_email: str
+
+class CreateRequest(BaseModel):
+    project_key: str
+    summary: str
+    description: str = ""
+    issue_type: str = "Task"
+
+
+@app.post("/tickets/transition")
+def do_transition(req: TransitionRequest, _key: str = Depends(verify_api_key)):
+    """Transition a ticket to a new status."""
+    result = transition_ticket(req.issue_key, req.target_status)
+    return QueryResponse(status="ok", agent_id=AGENT_ID, data=result)
+
+
+@app.post("/tickets/comment")
+def do_comment(req: CommentRequest, _key: str = Depends(verify_api_key)):
+    """Add a comment to a ticket."""
+    result = add_comment(req.issue_key, req.comment_body)
+    return QueryResponse(status="ok", agent_id=AGENT_ID, data=result)
+
+
+@app.post("/tickets/assign")
+def do_assign(req: AssignRequest, _key: str = Depends(verify_api_key)):
+    """Assign a ticket to a user."""
+    result = assign_ticket(req.issue_key, req.assignee_email)
+    return QueryResponse(status="ok", agent_id=AGENT_ID, data=result)
+
+
+@app.post("/tickets/create")
+def do_create(req: CreateRequest, _key: str = Depends(verify_api_key)):
+    """Create a new ticket."""
+    result = create_ticket(req.project_key, req.summary, req.description, req.issue_type)
+    return QueryResponse(status="ok", agent_id=AGENT_ID, data=result)
 
 
 # ── Query (natural language, for conductor routing) ──────────────

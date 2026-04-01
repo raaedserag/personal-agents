@@ -112,6 +112,26 @@ services:
   #     timeout: 5s
   #     retries: 3
 
+  # ─── Dashboard (React Web UI) ──────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: interfaces/dashboard/Dockerfile
+      args:
+        # In Docker, the browser accesses the conductor via the nginx proxy
+        VITE_API_URL: /api
+    container_name: nc-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - conductor
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # ─── Planner Agent (global, cross-job) ─────────────────────────
   planner:
     build:
