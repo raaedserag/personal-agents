@@ -254,9 +254,17 @@ def get_blocked_tickets(project_key: str = "") -> str:
     return f"Found {len(issues)} blocked ticket(s):\n\n" + "\n\n".join(lines)
 
 
-def get_blocked_tickets_structured(project_key: str = "") -> list[dict]:
-    """Returns structured blocked ticket data."""
+def get_blocked_tickets_structured(project_key: str = "", my_only: bool = False) -> list[dict]:
+    """Returns structured blocked ticket data.
+
+    Args:
+        project_key: Filter to a specific project.
+        my_only: If True, only return blocked tickets assigned to current user
+                 (for individual/IC scope — you don't care about team blockers).
+    """
     jql = "status = Blocked"
+    if my_only:
+        jql += " AND assignee = currentUser()"
     if project_key:
         jql += f" AND project = {project_key}"
     jql += " ORDER BY priority DESC, updated DESC"

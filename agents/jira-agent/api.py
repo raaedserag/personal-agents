@@ -119,7 +119,8 @@ def standup_data(_key: str = Depends(verify_api_key)):
     scope = ProfileScope.LEADER if PROFILE_SCOPE == "leader" else ProfileScope.INDIVIDUAL
 
     my_tickets = get_my_open_tickets_structured(20)
-    blocked = get_blocked_tickets_structured()
+    # Individual scope: only YOUR blocked tickets. Leader scope: all team blockers.
+    blocked = get_blocked_tickets_structured(my_only=(scope == ProfileScope.INDIVIDUAL))
 
     standup = StandupData(
         profile_id=PROFILE_ID,
