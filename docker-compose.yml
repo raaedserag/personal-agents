@@ -123,11 +123,11 @@ services:
     container_name: nc-dashboard
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "1607:1607"
     depends_on:
       - conductor
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      test: ["CMD", "curl", "-f", "http://localhost:1607"]
       interval: 10s
       timeout: 5s
       retries: 3

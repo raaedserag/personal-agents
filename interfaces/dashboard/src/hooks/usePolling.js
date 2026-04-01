@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-export function usePolling(fetchFn, intervalMs = 30000, deps = []) {
+export function usePolling(fetchFn, intervalMs = 16070, deps = []) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
