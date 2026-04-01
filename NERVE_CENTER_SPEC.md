@@ -492,10 +492,14 @@ model:
   default:
     provider: ollama
     name: llama3.2
-    base_url: http://ollama:11434
+    base_url: http://host.docker.internal:11434
   heavy:
-    provider: anthropic
-    name: claude-sonnet-4-20250514
+    provider: ollama
+    name: llama3.2
+    base_url: http://host.docker.internal:11434
+  # heavy:
+  #   provider: anthropic
+  #   name: claude-sonnet-4-20250514
     # API key from shared secrets
 ```
 

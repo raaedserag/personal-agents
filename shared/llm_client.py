@@ -30,13 +30,18 @@ class LLMClientConfig:
     default: ModelConfig = field(default_factory=lambda: ModelConfig(
         provider="ollama",
         name="llama3.2",
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434"),
     ))
     heavy: ModelConfig = field(default_factory=lambda: ModelConfig(
-        provider="anthropic",
-        name="claude-sonnet-4-20250514",
-        api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+        provider="ollama",
+        name="llama3.2",
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434"),
     ))
+    # heavy: ModelConfig = field(default_factory=lambda: ModelConfig(
+    #     provider="anthropic",
+    #     name="claude-sonnet-4-20250514",
+    #     api_key=os.getenv("ANTHROPIC_API_KEY", ""),
+    # ))
 
     @classmethod
     def from_yaml(cls, model_config: dict) -> LLMClientConfig:
