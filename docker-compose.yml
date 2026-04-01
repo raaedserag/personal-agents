@@ -40,6 +40,7 @@ services:
       - JIRA_DOMAIN=${YASSIR_JIRA_DOMAIN}
       - JIRA_EMAIL=${YASSIR_JIRA_EMAIL}
       - JIRA_API_TOKEN=${YASSIR_JIRA_TOKEN}
+      - JIRA_PROJECT_KEYS=${YASSIR_JIRA_PROJECT_KEYS:-EXDR}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

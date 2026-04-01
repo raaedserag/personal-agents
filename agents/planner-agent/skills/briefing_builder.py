@@ -2,7 +2,9 @@
 Briefing Builder — Aggregates data from other agents and synthesizes reports.
 
 This is the core skill of the planner agent. It calls jira-agents and github-agents
-via HTTP, collects their data, and uses Claude to produce polished briefings.
+via HTTP, collects their data, and uses the LLM to produce action-oriented briefings.
+
+The briefings answer "What should I do next?" — not just "Here's a data dump."
 """
 
 from __future__ import annotations
@@ -46,7 +48,7 @@ def get_registry() -> AgentRegistry:
 # ── Data Collection ─────────────────────────────────────────────
 
 def _collect_jira_data(registry: AgentRegistry) -> dict:
-    """Collect standup and blocker data from all jira agents."""
+    """Collect standup, blocker, and notification data from all jira agents."""
     data: dict = {}
     jira_agents = registry.get_by_type("jira")
     for agent_id, client in jira_agents:
@@ -62,6 +64,13 @@ def _collect_jira_data(registry: AgentRegistry) -> dict:
             agent_data["blocked"] = blocked.get("data", "")
         else:
             agent_data["blocked"] = {"error": blocked.get("error", "Failed to fetch")}
+
+        # Notifications — recent activity by others in your projects
+        notifs = client.get_notifications(hours=24)
+        if notifs.get("status") == "ok":
+            agent_data["notifications"] = notifs.get("data", {})
+        else:
+            agent_data["notifications"] = {"error": notifs.get("error", "Failed to fetch")}
 
         data[agent_id] = agent_data
     return data
@@ -92,56 +101,60 @@ def _collect_infra_data(registry: AgentRegistry) -> dict:
 
 # ── Briefing Synthesis ──────────────────────────────────────────
 
-MORNING_SYSTEM_PROMPT = """You generate morning briefings from raw agent data. Output valid markdown.
+MORNING_SYSTEM_PROMPT = """You are a personal operations assistant. You generate concise, action-oriented morning briefings.
 
-Use these sections (skip empty ones):
+Your job is NOT to list every piece of data. Your job is to RECOMMEND what to do first, second, third.
 
-## Blockers & Incidents
-- List each blocker as: **[TICKET-KEY]** Summary — assigned to: Name (Priority)
+Output valid markdown with these sections (skip empty ones):
 
-## Your Tickets Today
-- List each ticket as: **[TICKET-KEY]** Summary — Status, Priority
-- Group by job profile if multiple profiles have data
+## Recommended Actions
+1. Numbered list of what to tackle today, in priority order
+   - Each item: what to do, why it matters, ticket/PR reference
+   - Blockers and reviews first, then high-priority work, then everything else
 
-## Infra Health
-- Brief bullet points about infrastructure status
+## Important Updates
+- Key things that changed overnight (comments, status changes, new assignments)
+- Only include updates that require your attention — skip noise
 
-## PRs Needing Attention
-- List each PR as: **repo#number** Title — by Author (CI: status)
+## Blockers
+- List only if there are actual blockers: **[KEY]** Description — who's blocked
 
-## Suggested Focus Order
-1. Most urgent items first (blockers, then high priority, then reviews)
+## PRs Needing Your Action
+- PRs you need to review or that have failing CI
+- Skip PRs that are fine and don't need attention
+
+Rules:
+- Be opinionated — tell me what to do, don't just list things
+- Use bullet lists, NOT tables
+- Skip sections with no data
+- Never fabricate ticket IDs or PR numbers
+- Keep it under 300 words — I'll ask for details if needed
+- Bold the ticket keys and PR numbers"""
+
+
+EOD_SYSTEM_PROMPT = """You are a personal operations assistant. Generate a brief end-of-day summary.
+
+Focus on: what's still open, what needs follow-up tomorrow, and any blockers carried over.
+
+Output valid markdown:
+
+## Still Open
+- Tickets/PRs that need continued work tomorrow
+
+## Carry-Over Blockers
+- Only if there are unresolved blockers
+
+## Tomorrow's Top 3
+1. Three most important things to start with tomorrow
 
 Rules:
 - Use bullet lists, NOT tables
-- Be concise, no filler
-- Use the actual data provided, never fabricate IDs
-- Bold the ticket keys and PR numbers for readability"""
-
-
-EOD_SYSTEM_PROMPT = """You generate end-of-day summaries from raw agent data. Output valid markdown.
-
-Use these sections (skip empty ones):
-
-## Still In Progress
-- List tickets still being worked on as bullet points
-
-## Blockers Carried Over
-- Any blockers that weren't resolved
-
-## PRs Status
-- Open PRs, pending reviews
-
-## Tomorrow's Priorities
-1. Top 2-3 items to focus on next
-
-Rules:
-- Use bullet lists, NOT tables
-- Be brief and actionable
+- Be brief — 150 words max
+- Skip empty sections
 - Never fabricate data"""
 
 
-BLOCKER_SYSTEM_PROMPT = """List blockers from the raw data. Output valid markdown.
+BLOCKER_SYSTEM_PROMPT = """List active blockers from the data. Output valid markdown.
 
 Format each as:
 - **[TICKET-KEY]** Description — Assignee (Priority)
@@ -151,7 +164,7 @@ Be extremely concise."""
 
 
 def build_morning_briefing() -> dict:
-    """Build a full morning briefing by collecting data from all agents and synthesizing with Claude."""
+    """Build a full morning briefing by collecting data from all agents and synthesizing."""
     registry = get_registry()
     now = datetime.now(timezone.utc)
 
@@ -160,13 +173,13 @@ def build_morning_briefing() -> dict:
     github_data = _collect_github_data(registry)
     infra_data = _collect_infra_data(registry)
 
-    # Build context for Claude
+    # Build context for LLM
     raw_context = _format_raw_context(jira_data, github_data, infra_data)
 
-    # Synthesize with Claude
+    # Synthesize with LLM
     client = get_llm_client()
     markdown = client.complete(
-        messages=[{"role": "user", "content": f"Generate a morning briefing for {now.strftime('%A, %B %d')}.\n\nRaw data:\n{raw_context}"}],
+        messages=[{"role": "user", "content": f"Generate my morning briefing for {now.strftime('%A, %B %d')}. Tell me what to do today.\n\nRaw data:\n{raw_context}"}],
         task_type="heavy",
         system_prompt=MORNING_SYSTEM_PROMPT,
         max_tokens=2048,
@@ -196,7 +209,7 @@ def build_eod_summary() -> dict:
 
     client = get_llm_client()
     markdown = client.complete(
-        messages=[{"role": "user", "content": f"Generate an end-of-day summary for {now.strftime('%A, %B %d')}.\n\nRaw data:\n{raw_context}"}],
+        messages=[{"role": "user", "content": f"Generate my end-of-day summary for {now.strftime('%A, %B %d')}.\n\nRaw data:\n{raw_context}"}],
         task_type="heavy",
         system_prompt=EOD_SYSTEM_PROMPT,
         max_tokens=2048,
@@ -308,7 +321,7 @@ def build_pr_digest() -> dict:
 # ── Formatting Helpers ──────────────────────────────────────────
 
 def _format_raw_context(jira_data: dict, github_data: dict, infra_data: dict) -> str:
-    """Format collected raw data into a text context for Claude."""
+    """Format collected raw data into a text context for LLM."""
     parts: list[str] = []
 
     # Jira section
@@ -321,9 +334,9 @@ def _format_raw_context(jira_data: dict, github_data: dict, infra_data: dict) ->
         if isinstance(standup, dict) and "error" not in standup:
             my_tickets = standup.get("my_tickets", [])
             if my_tickets:
-                parts.append(f"\nOpen tickets ({len(my_tickets)}):")
+                parts.append(f"\nYour open tickets ({len(my_tickets)}):")
                 for t in my_tickets:
-                    parts.append(f"- [{t.get('key', '?')}] {t.get('summary', '?')} | Status: {t.get('status', '?')} | Priority: {t.get('priority', '?')} | Assignee: {t.get('assignee', '?')}")
+                    parts.append(f"- [{t.get('key', '?')}] {t.get('summary', '?')} | Status: {t.get('status', '?')} | Priority: {t.get('priority', '?')}")
 
             blocked = standup.get("blocked_tickets", [])
             if blocked:
@@ -335,9 +348,43 @@ def _format_raw_context(jira_data: dict, github_data: dict, infra_data: dict) ->
             if stale:
                 parts.append(f"\nStale tickets ({len(stale)}):")
                 for t in stale:
-                    parts.append(f"- [{t.get('key', '?')}] {t.get('summary', '?')} | Assignee: {t.get('assignee', '?')} | Last updated: {t.get('updated', '?')}")
+                    parts.append(f"- [{t.get('key', '?')}] {t.get('summary', '?')} | Last updated: {t.get('updated', '?')}")
+
+            # Recent activity from standup data
+            activity = standup.get("recent_activity", [])
+            if activity:
+                parts.append(f"\nRecent activity by others ({len(activity)} items):")
+                for a in activity:
+                    line = f"- [{a.get('key', '?')}] {a.get('summary', '?')} | Status: {a.get('status', '?')}"
+                    comment = a.get("latest_comment")
+                    if comment:
+                        line += f" | Comment by {comment.get('author', '?')}: \"{comment.get('body', '')[:100]}\""
+                    parts.append(line)
         else:
             parts.append(f"Error fetching standup: {standup}")
+
+        # Notification data (mentions + extra activity)
+        notifs = data.get("notifications", {})
+        if isinstance(notifs, dict) and "error" not in notifs:
+            mentioned = notifs.get("mentioned", [])
+            if mentioned:
+                parts.append(f"\nTickets where you were mentioned ({len(mentioned)}):")
+                for m in mentioned:
+                    line = f"- [{m.get('key', '?')}] {m.get('summary', '?')}"
+                    comment = m.get("latest_comment")
+                    if comment:
+                        line += f" | {comment.get('author', '?')}: \"{comment.get('body', '')[:100]}\""
+                    parts.append(line)
+
+            recent = notifs.get("recent_activity", [])
+            if recent and not (isinstance(standup, dict) and standup.get("recent_activity")):
+                parts.append(f"\nRecent updates in your projects ({len(recent)}):")
+                for a in recent[:10]:
+                    line = f"- [{a.get('key', '?')}] {a.get('summary', '?')} | {a.get('status', '?')}"
+                    comment = a.get("latest_comment")
+                    if comment:
+                        line += f" | {comment.get('author', '?')}: \"{comment.get('body', '')[:80]}\""
+                    parts.append(line)
 
     # GitHub section
     parts.append("\n\n## GITHUB DATA")

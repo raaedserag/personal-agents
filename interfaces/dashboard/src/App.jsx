@@ -6,6 +6,7 @@ import TicketList from "./components/TicketList";
 import PRDigest from "./components/PRDigest";
 import TicketSummary from "./components/TicketSummary";
 import BlockerAlerts from "./components/BlockerAlerts";
+import ActivityFeed from "./components/ActivityFeed";
 import AgentHealth from "./components/AgentHealth";
 import QueryBar from "./components/QueryBar";
 import "./App.css";
@@ -51,6 +52,7 @@ export default function App() {
         <div className="dashboard-grid">
           <div className="grid-col-main">
             <BriefingPanel profileId={activeProfile} />
+            <ActivityFeed profileId={activeProfile} />
             <TicketList profileId={activeProfile} />
           </div>
           <div className="grid-col-side">

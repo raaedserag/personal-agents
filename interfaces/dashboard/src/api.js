@@ -36,6 +36,10 @@ export const getBriefing = (type, profileId) =>
 export const getTickets = (profileId) =>
   request("GET", "/briefing/tickets", { params: profileId ? { profile_id: profileId } : {} });
 
+// Notifications / Activity Feed
+export const getNotifications = (profileId) =>
+  request("GET", "/notifications", { params: profileId ? { profile_id: profileId } : {} });
+
 // Query
 export const sendQuery = (query, profileId) =>
   request("POST", "/query", { body: { query, profile_id: profileId || "" } });

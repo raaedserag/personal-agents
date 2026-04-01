@@ -321,6 +321,42 @@ body {
 .pr-link { color: var(--text-muted); transition: color 0.2s; }
 .pr-link:hover { color: var(--accent); }
 
+/* ── Activity Feed ──────────────────────────────────────────── */
+.activity-row {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.activity-row:last-child { border-bottom: none; }
+.activity-row.mention { border-left: 3px solid var(--warning); padding-left: 10px; }
+
+.activity-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.activity-summary { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.activity-comment {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 4px 8px;
+  margin: 4px 0;
+  background: var(--bg-input);
+  border-radius: var(--radius);
+  line-height: 1.4;
+}
+.activity-author { font-weight: 600; color: var(--text); margin-right: 4px; }
+.activity-body { color: var(--text-dim); }
+
+.activity-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.activity-project { font-size: 11px; color: var(--text-muted); }
+
 /* ── Jira Summary Panel ─────────────────────────────────────── */
 .ticket-key-badge {
   font-size: 12px;

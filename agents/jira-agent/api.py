@@ -28,6 +28,8 @@ from skills.jira_fetcher import (
     get_blocked_tickets,
     get_blocked_tickets_structured,
     get_stale_tickets,
+    get_recent_activity,
+    get_mentioned_tickets,
     search_tickets,
     get_team_open_tickets,
     transition_ticket,
@@ -131,9 +133,35 @@ def standup_data(_key: str = Depends(verify_api_key)):
         stale = get_stale_tickets(days=3)
         standup.stale_tickets = [TicketSummary(**t) for t in stale]
 
+    # Include recent activity as part of standup context
+    activity = get_recent_activity(hours=24, max_results=10)
+
+    standup_dict = standup.model_dump()
+    standup_dict["recent_activity"] = activity
+
     return QueryResponse(
         status="ok", agent_id=AGENT_ID,
-        data=standup.model_dump(),
+        data=standup_dict,
+    )
+
+
+# ── Notifications / Activity Feed ───────────────────────────────
+
+@app.get("/notifications")
+def notifications(
+    hours: int = Query(default=24, ge=1, le=168),
+    max_results: int = Query(default=15, ge=1, le=50),
+    _key: str = Depends(verify_api_key),
+):
+    """Get recent activity in configured projects (tickets updated by others)."""
+    activity = get_recent_activity(hours=hours, max_results=max_results)
+    mentioned = get_mentioned_tickets(days=7, max_results=5)
+    return QueryResponse(
+        status="ok", agent_id=AGENT_ID,
+        data={
+            "recent_activity": activity,
+            "mentioned": mentioned,
+        },
     )
 
 

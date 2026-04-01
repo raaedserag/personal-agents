@@ -91,6 +91,9 @@ class AgentClient:
     def get_blocked_tickets(self) -> dict[str, Any]:
         return self._request("GET", "/tickets/blocked")
 
+    def get_notifications(self, hours: int = 24) -> dict[str, Any]:
+        return self._request("GET", "/notifications", params={"hours": hours})
+
     # ── GitHub Agent Shortcuts ───────────────────────────────────
 
     def get_open_prs(self, author: str = "", reviewer: str = "") -> dict[str, Any]:

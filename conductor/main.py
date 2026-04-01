@@ -323,6 +323,24 @@ def get_briefing(briefing_type: str, profile_id: str = Query(default="")):
         )
 
 
+@app.get("/notifications")
+def get_notifications(profile_id: str = Query(default="")):
+    """Get recent activity / notifications from Jira agents."""
+    all_notifs: dict[str, Any] = {}
+
+    if profile_id:
+        agents = [(f"jira-{profile_id}", registry.get(f"jira-{profile_id}"))]
+    else:
+        agents = registry.get_by_type("jira")
+
+    for agent_id, client in agents:
+        if client:
+            result = client.get_notifications(hours=24)
+            all_notifs[agent_id] = result
+
+    return {"status": "ok", "data": all_notifs}
+
+
 def _aggregate_blockers(profile_id: str = "") -> dict:
     """Aggregate blocked tickets from all jira agents."""
     all_blockers: dict[str, Any] = {}
