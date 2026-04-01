@@ -24,12 +24,12 @@ agents:
   #   url: http://github-zeal:8000
   #   port: 20010
   #
-  # - id: planner
-  #   type: planner
-  #   profile: global
-  #   url: http://planner:8000
-  #   port: 20020
-  #
+  - id: planner
+    type: planner
+    profile: global
+    url: http://planner:8000
+    port: 20020
+
   # - id: infra-zeal
   #   type: infra
   #   profile: zeal

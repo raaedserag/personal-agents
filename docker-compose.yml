@@ -112,6 +112,34 @@ services:
   #     timeout: 5s
   #     retries: 3
 
+  # ─── Planner Agent (global, cross-job) ─────────────────────────
+  planner:
+    build:
+      context: .
+      dockerfile: agents/planner-agent/Dockerfile
+    container_name: nc-planner
+    restart: unless-stopped
+    ports:
+      - "20020:8000"
+    env_file:
+      - secrets/shared.env
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - PLANNER_AGENTS=jira-yassir=http://jira-yassir:8000,github-yassir=http://github-yassir:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - memory_data:/app/data
+    depends_on:
+      - jira-yassir
+      - github-yassir
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # ─── Jira Agent: Zeal (Leader scope) ──────────────────────────
   # Uncomment when ready to add Zeal:
   #

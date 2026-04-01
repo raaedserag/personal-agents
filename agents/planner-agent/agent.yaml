@@ -1,0 +1,25 @@
+spec_version: "0.2.0"
+name: nerve-planner-agent
+version: 1.0.0
+description: >
+  Cross-job planner agent for the Nerve Center platform.
+  Aggregates data from all jira and github agents, synthesizes
+  morning briefings, EOD summaries, blocker alerts, and PR digests.
+  This is the "daily brain" — it does heavy Claude-powered synthesis.
+
+model:
+  default:
+    provider: ollama
+    name: llama3.2
+    base_url: http://ollama:11434
+  heavy:
+    provider: anthropic
+    name: claude-sonnet-4-20250514
+
+skills:
+  - briefing_builder
+  - blocker_monitor
+
+secrets:
+  - AGENT_API_KEY
+  - ANTHROPIC_API_KEY

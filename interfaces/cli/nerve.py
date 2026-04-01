@@ -413,17 +413,96 @@ def pr_digest(job: str):
 # ── Briefing ─────────────────────────────────────────────────────
 
 @cli.command()
-@click.argument("briefing_type", type=click.Choice(["blockers", "tickets", "prs", "morning"]))
+@click.argument("briefing_type", type=click.Choice(["blockers", "tickets", "prs", "morning", "eod"]))
 @click.option("--job", "-j", default="", help="Filter by job profile")
 def briefing(briefing_type: str, job: str):
-    """Trigger a briefing (blockers, tickets, prs, morning)."""
+    """Trigger a briefing (blockers, tickets, prs, morning, eod)."""
     params = {"profile_id": job} if job else {}
+
+    console.print(f"[dim]Generating {briefing_type} briefing...[/dim]")
     data = _request("GET", f"/briefing/{briefing_type}", params=params)
+
+    # If planner agent produced a synthesized markdown briefing
+    _render_briefing_response(data, briefing_type)
+
+
+def _render_briefing_response(data: dict, briefing_type: str):
+    """Render a briefing response — handles both raw and synthesized formats."""
+    # Check for planner-synthesized response (has markdown field)
+    inner = data.get("data", data)
+    if isinstance(inner, dict):
+        # Planner agent wraps in QueryResponse -> data -> briefing dict
+        briefing_data = inner.get("data", inner) if "data" in inner else inner
+        if isinstance(briefing_data, dict) and "markdown" in briefing_data:
+            md = briefing_data["markdown"]
+            console.print(Panel(
+                Markdown(md),
+                title=f"[bold]{briefing_type.upper()} Briefing[/bold]",
+                border_style="cyan",
+                padding=(1, 2),
+            ))
+            generated = briefing_data.get("generated_at", "")
+            if generated:
+                console.print(f"[dim]Generated at: {generated}[/dim]")
+            return
+
+    # Fallback: raw data display
     console.print(Panel(
         str(data.get("data", data)),
         title=f"[bold]Briefing: {briefing_type}[/bold]",
         border_style="cyan",
     ))
+
+
+# ── Scheduler ───────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("action", type=click.Choice(["status", "trigger"]), default="status")
+@click.option("--name", "-n", default="", help="Schedule name to trigger")
+def schedule(action: str, name: str):
+    """View scheduler status or trigger a scheduled job."""
+    if action == "status":
+        data = _request("GET", "/scheduler/status")
+        running = data.get("running", False)
+        console.print(f"Scheduler: {'[green]running[/green]' if running else '[red]stopped[/red]'}")
+
+        jobs = data.get("jobs", {})
+        if not jobs:
+            console.print("[dim]No scheduled jobs.[/dim]")
+            return
+
+        table = Table(title="Scheduled Jobs")
+        table.add_column("Name", style="cyan")
+        table.add_column("Cron")
+        table.add_column("Action", style="magenta")
+        table.add_column("Last Run")
+        table.add_column("Report", justify="center")
+
+        for job_name, info in jobs.items():
+            last_run = info.get("last_run", "never") or "never"
+            if last_run != "never":
+                last_run = last_run[:19]
+            has_report = "[green]yes[/green]" if info.get("has_report") else "[dim]no[/dim]"
+            table.add_row(job_name, info.get("cron", "?"), info.get("action", "?"), last_run, has_report)
+
+        console.print(table)
+
+    elif action == "trigger":
+        if not name:
+            console.print("[red]Use --name to specify which schedule to trigger.[/red]")
+            return
+        console.print(f"[dim]Triggering {name}...[/dim]")
+        data = _request("POST", f"/scheduler/trigger/{name}")
+        result = data.get("result", {})
+
+        # Try to render as briefing
+        if isinstance(result, dict) and "data" in result:
+            inner = result.get("data", {})
+            if isinstance(inner, dict) and "markdown" in inner:
+                _render_briefing_response(result, name)
+                return
+
+        console.print(Panel(str(result), title=f"[bold]{name}[/bold]", border_style="green"))
 
 
 # ── Context Switch ───────────────────────────────────────────────

@@ -26,6 +26,8 @@ from shared.agent_client import AgentClient, AgentRegistry
 from shared.auth import verify_dashboard_pin
 from shared.models import QueryResponse
 
+from scheduler import Scheduler
+
 load_dotenv()
 
 # ── Config Loading ───────────────────────────────────────────────
@@ -41,6 +43,7 @@ def load_config() -> dict:
 # ── Agent Registry Setup ────────────────────────────────────────
 
 registry = AgentRegistry()
+scheduler = Scheduler()
 
 
 def init_registry(config: dict) -> None:
@@ -54,14 +57,44 @@ def init_registry(config: dict) -> None:
         )
 
 
+def init_scheduler(config: dict) -> None:
+    """Set up scheduled jobs from config and register action handlers."""
+    schedules = config.get("schedules", {})
+
+    # Register action handlers — each calls the planner agent's endpoint
+    def _make_planner_action(endpoint: str):
+        def handler():
+            planner = registry.get("planner")
+            if not planner:
+                return {"error": "Planner agent not available"}
+            return planner.get(f"/briefing/{endpoint}")
+        return handler
+
+    scheduler.register_action("planner.morning_briefing", _make_planner_action("morning"))
+    scheduler.register_action("planner.eod_summary", _make_planner_action("eod"))
+    scheduler.register_action("planner.blocker_alert", _make_planner_action("blockers"))
+    scheduler.register_action("planner.pr_digest", _make_planner_action("prs"))
+
+    for name, sched in schedules.items():
+        scheduler.register_schedule(
+            name=name,
+            cron_expr=sched["cron"],
+            action=sched["action"],
+            deliver_to=sched.get("deliver_to", []),
+        )
+
+    scheduler.start()
+
+
 # ── App Lifecycle ────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config = load_config()
     init_registry(config)
-    # TODO: Start scheduler (Phase 1 uses manual triggers only)
+    init_scheduler(config)
     yield
+    scheduler.stop()
 
 
 app = FastAPI(
@@ -267,6 +300,13 @@ def get_briefing(briefing_type: str, profile_id: str = Query(default="")):
     In Phase 1, this aggregates raw data from agents.
     In Phase 2+, the planner agent will synthesize this with an LLM.
     """
+    # If planner agent is available, delegate synthesis to it
+    planner = registry.get("planner")
+    if planner and briefing_type in ("morning", "eod", "blockers", "prs"):
+        result = planner.get(f"/briefing/{briefing_type}")
+        return result
+
+    # Fallback: raw aggregation without LLM synthesis
     if briefing_type == "blockers":
         return _aggregate_blockers(profile_id)
     elif briefing_type == "tickets":
@@ -279,7 +319,7 @@ def get_briefing(briefing_type: str, profile_id: str = Query(default="")):
         return QueryResponse(
             status="unsupported",
             error=f"Briefing type '{briefing_type}' not yet implemented. "
-                  f"Available: blockers, tickets, prs, morning.",
+                  f"Available: blockers, tickets, prs, morning, eod.",
         )
 
 
@@ -384,6 +424,39 @@ def _aggregate_morning(profile_id: str = "") -> dict:
         "generated_at": datetime.utcnow().isoformat(),
         "data": sections,
     }
+
+
+# ── Scheduler & Reports ────────────────────────────────────────
+
+@app.get("/scheduler/status")
+def scheduler_status():
+    """Get scheduler status and job info."""
+    return scheduler.get_status()
+
+
+@app.post("/scheduler/trigger/{schedule_name}")
+def trigger_schedule(schedule_name: str):
+    """Manually trigger a scheduled job."""
+    result = scheduler.trigger_now(schedule_name)
+    return {"status": "ok", "schedule": schedule_name, "result": result}
+
+
+@app.get("/reports/latest")
+def latest_reports():
+    """Get the latest generated reports from scheduled jobs."""
+    return {"status": "ok", "reports": scheduler.get_all_latest_reports()}
+
+
+@app.get("/reports/{schedule_name}")
+def get_report(schedule_name: str):
+    """Get the latest report for a specific schedule."""
+    report = scheduler.get_latest_report(schedule_name)
+    if report is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No report found for '{schedule_name}'. Trigger it with POST /scheduler/trigger/{schedule_name}",
+        )
+    return {"status": "ok", "schedule": schedule_name, "report": report}
 
 
 if __name__ == "__main__":
