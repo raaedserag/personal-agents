@@ -1,0 +1,21 @@
+spec_version: "0.2.0"
+name: nerve-calendar-agent
+version: 1.0.0
+description: >
+  Google Calendar agent for the Nerve Center platform.
+  Surfaces today's schedule, upcoming events, and free time blocks.
+  Shared across all profiles (your calendar is one).
+
+model:
+  default:
+    provider: ollama
+    name: llama3.2
+    base_url: http://host.docker.internal:11434
+
+skills:
+  - calendar_fetcher
+
+secrets:
+  - GOOGLE_CLIENT_ID
+  - GOOGLE_CLIENT_SECRET
+  - AGENT_API_KEY

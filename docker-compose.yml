@@ -13,8 +13,11 @@ services:
     environment:
       - AGENT_API_KEY=${AGENT_API_KEY}
       - DASHBOARD_PIN=${DASHBOARD_PIN:-1234}
+      - REMINDER_DB_PATH=/app/data/reminders.db
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - memory_data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:10000/health"]
       interval: 10s
@@ -81,6 +84,126 @@ services:
       timeout: 5s
       retries: 3
 
+  # ─── Slack Agent: Yassir ──────────────────────────────────────
+  slack-yassir:
+    build:
+      context: .
+      dockerfile: agents/slack-agent/Dockerfile
+    container_name: nc-slack-yassir
+    restart: unless-stopped
+    ports:
+      - "20050:8000"
+    env_file:
+      - secrets/yassir.env
+      - secrets/shared.env
+    environment:
+      - PROFILE_ID=yassir
+      - SLACK_USER_TOKEN=${YASSIR_SLACK_USER_TOKEN}
+      - SLACK_CHANNELS=${YASSIR_SLACK_CHANNELS:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── Calendar Agent (global — one calendar) ───────────────────
+  calendar:
+    build:
+      context: .
+      dockerfile: agents/calendar-agent/Dockerfile
+    container_name: nc-calendar
+    restart: unless-stopped
+    ports:
+      - "20060:8000"
+    env_file:
+      - secrets/shared.env
+    environment:
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALENDAR_ID=${GOOGLE_CALENDAR_ID:-primary}
+      - GOOGLE_TOKEN_FILE=/app/data/google_tokens.json
+    volumes:
+      - memory_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── Gmail Agent (global — one inbox) ─────────────────────────
+  gmail:
+    build:
+      context: .
+      dockerfile: agents/gmail-agent/Dockerfile
+    container_name: nc-gmail
+    restart: unless-stopped
+    ports:
+      - "20070:8000"
+    env_file:
+      - secrets/shared.env
+    environment:
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_TOKEN_FILE=/app/data/google_tokens.json
+    volumes:
+      - memory_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── Dashboard (React Web UI) ──────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: interfaces/dashboard/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: nc-dashboard
+    restart: unless-stopped
+    ports:
+      - "1508:1508"
+    depends_on:
+      - conductor
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1508"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ─── Planner Agent (global, cross-job) ─────────────────────────
+  planner:
+    build:
+      context: .
+      dockerfile: agents/planner-agent/Dockerfile
+    container_name: nc-planner
+    restart: unless-stopped
+    ports:
+      - "20020:8000"
+    env_file:
+      - secrets/shared.env
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - AGENT_API_KEY=${AGENT_API_KEY}
+      - CONDUCTOR_URL=http://conductor:10000
+      - PLANNER_AGENTS=jira-yassir=http://jira-yassir:8000,github-yassir=http://github-yassir:8000,slack-yassir=http://slack-yassir:8000,calendar=http://calendar:8000,gmail=http://gmail:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - memory_data:/app/data
+    depends_on:
+      - jira-yassir
+      - github-yassir
+      - slack-yassir
+      - calendar
+      - gmail
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # ─── GitHub Agent: Zeal (Leader scope) ────────────────────────
   # Uncomment when ready to add Zeal GitHub:
   #
@@ -113,54 +236,6 @@ services:
   #     timeout: 5s
   #     retries: 3
 
-  # ─── Dashboard (React Web UI) ──────────────────────────────────
-  dashboard:
-    build:
-      context: .
-      dockerfile: interfaces/dashboard/Dockerfile
-      args:
-        # In Docker, the browser accesses the conductor via the nginx proxy
-        VITE_API_URL: /api
-    container_name: nc-dashboard
-    restart: unless-stopped
-    ports:
-      - "1508:1508"
-    depends_on:
-      - conductor
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1508"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  # ─── Planner Agent (global, cross-job) ─────────────────────────
-  planner:
-    build:
-      context: .
-      dockerfile: agents/planner-agent/Dockerfile
-    container_name: nc-planner
-    restart: unless-stopped
-    ports:
-      - "20020:8000"
-    env_file:
-      - secrets/shared.env
-    environment:
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - AGENT_API_KEY=${AGENT_API_KEY}
-      - PLANNER_AGENTS=jira-yassir=http://jira-yassir:8000,github-yassir=http://github-yassir:8000
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - memory_data:/app/data
-    depends_on:
-      - jira-yassir
-      - github-yassir
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
   # ─── Jira Agent: Zeal (Leader scope) ──────────────────────────
   # Uncomment when ready to add Zeal:
   #
@@ -182,6 +257,7 @@ services:
   #     - JIRA_DOMAIN=${ZEAL_JIRA_DOMAIN}
   #     - JIRA_EMAIL=${ZEAL_JIRA_EMAIL}
   #     - JIRA_API_TOKEN=${ZEAL_JIRA_TOKEN}
+  #     - JIRA_PROJECT_KEYS=${ZEAL_JIRA_PROJECT_KEYS:-}
   #   extra_hosts:
   #     - "host.docker.internal:host-gateway"
   #   volumes:

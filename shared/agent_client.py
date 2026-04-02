@@ -110,6 +110,30 @@ class AgentClient:
     def get_pr_summary(self, owner: str, repo: str, pr_number: int) -> dict[str, Any]:
         return self._request("GET", f"/prs/{owner}/{repo}/{pr_number}/summary")
 
+    # ── Slack Agent Shortcuts ────────────────────────────────────
+
+    def get_slack_highlights(self, hours: int = 24) -> dict[str, Any]:
+        return self._request("GET", "/highlights", params={"hours": hours})
+
+    def get_slack_mentions(self, hours: int = 24) -> dict[str, Any]:
+        return self._request("GET", "/mentions", params={"hours": hours})
+
+    # ── Calendar Agent Shortcuts ─────────────────────────────────
+
+    def get_today_events(self) -> dict[str, Any]:
+        return self._request("GET", "/today")
+
+    def get_free_slots(self) -> dict[str, Any]:
+        return self._request("GET", "/free-slots")
+
+    # ── Gmail Agent Shortcuts ────────────────────────────────────
+
+    def get_unread_emails(self) -> dict[str, Any]:
+        return self._request("GET", "/unread")
+
+    def get_action_needed_emails(self) -> dict[str, Any]:
+        return self._request("GET", "/action-needed")
+
 
 class AgentRegistry:
     """Manages connections to multiple agents. Used by the conductor."""

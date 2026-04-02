@@ -99,6 +99,41 @@ def _collect_infra_data(registry: AgentRegistry) -> dict:
     return data
 
 
+def _collect_slack_data(registry: AgentRegistry) -> dict:
+    """Collect Slack highlights from all slack agents."""
+    data: dict = {}
+    slack_agents = registry.get_by_type("slack")
+    for agent_id, client in slack_agents:
+        result = client.get_slack_highlights(hours=24)
+        if result.get("status") == "ok":
+            data[agent_id] = result.get("data", {})
+        else:
+            data[agent_id] = {"error": result.get("error", "Failed to fetch")}
+    return data
+
+
+def _collect_calendar_data(registry: AgentRegistry) -> dict:
+    """Collect today's calendar events."""
+    cal = registry.get("calendar")
+    if not cal:
+        return {}
+    result = cal.get_today_events()
+    if result.get("status") == "ok":
+        return {"calendar": result.get("data", {})}
+    return {"calendar": {"error": result.get("error", "Failed to fetch")}}
+
+
+def _collect_gmail_data(registry: AgentRegistry) -> dict:
+    """Collect emails needing action."""
+    gmail = registry.get("gmail")
+    if not gmail:
+        return {}
+    result = gmail.get_action_needed_emails()
+    if result.get("status") == "ok":
+        return {"gmail": result.get("data", {})}
+    return {"gmail": {"error": result.get("error", "Failed to fetch")}}
+
+
 # ── Briefing Synthesis ──────────────────────────────────────────
 
 MORNING_SYSTEM_PROMPT = """You are a personal operations assistant. You generate concise, action-oriented morning briefings.
@@ -109,26 +144,31 @@ Output valid markdown with these sections (skip empty ones):
 
 ## Recommended Actions
 1. Numbered list of what to tackle today, in priority order
-   - Each item: what to do, why it matters, ticket/PR reference
-   - Blockers and reviews first, then high-priority work, then everything else
+   - Factor in: meetings (avoid deep work before meetings), blockers, pending reviews, emails needing reply
+   - Each item: what to do, why it matters, ticket/PR/email reference
+
+## Today's Schedule
+- List meetings with times. Flag free time blocks for deep work.
 
 ## Important Updates
-- Key things that changed overnight (comments, status changes, new assignments)
-- Only include updates that require your attention — skip noise
+- Key things that changed overnight — Slack mentions, email replies, Jira comments, PR reviews
+- Only include updates that require attention — skip noise
 
 ## Blockers
-- List only if there are actual blockers: **[KEY]** Description — who's blocked
+- List only if there are actual blockers: **[KEY]** Description
 
-## PRs Needing Your Action
-- PRs you need to review or that have failing CI
-- Skip PRs that are fine and don't need attention
+## Pending Replies
+- Emails, Slack DMs, or PR reviews waiting on you
+
+## Reminders
+- Due or overdue personal reminders
 
 Rules:
 - Be opinionated — tell me what to do, don't just list things
 - Use bullet lists, NOT tables
 - Skip sections with no data
-- Never fabricate ticket IDs or PR numbers
-- Keep it under 300 words — I'll ask for details if needed
+- Never fabricate IDs, names, or references
+- Keep it under 400 words — I'll ask for details if needed
 - Bold the ticket keys and PR numbers"""
 
 
@@ -163,6 +203,24 @@ If there are no blockers, say "No active blockers." only.
 Be extremely concise."""
 
 
+def _collect_reminders() -> list[dict]:
+    """Fetch due reminders from the conductor's reminder store."""
+    # Planner runs in a separate container — fetch reminders via conductor API
+    import requests as _req
+    conductor_url = os.getenv("CONDUCTOR_URL", "http://conductor:10000")
+    try:
+        resp = _req.get(
+            f"{conductor_url}/reminders/due",
+            headers={"x-api-key": AGENT_API_KEY},
+            timeout=5,
+        )
+        if resp.status_code == 200:
+            return resp.json().get("reminders", [])
+    except Exception:
+        pass
+    return []
+
+
 def build_morning_briefing() -> dict:
     """Build a full morning briefing by collecting data from all agents and synthesizing."""
     registry = get_registry()
@@ -172,9 +230,17 @@ def build_morning_briefing() -> dict:
     jira_data = _collect_jira_data(registry)
     github_data = _collect_github_data(registry)
     infra_data = _collect_infra_data(registry)
+    slack_data = _collect_slack_data(registry)
+    calendar_data = _collect_calendar_data(registry)
+    gmail_data = _collect_gmail_data(registry)
+    reminders = _collect_reminders()
 
     # Build context for LLM
-    raw_context = _format_raw_context(jira_data, github_data, infra_data)
+    raw_context = _format_raw_context(
+        jira_data, github_data, infra_data,
+        slack_data=slack_data, calendar_data=calendar_data,
+        gmail_data=gmail_data, reminders=reminders,
+    )
 
     # Synthesize with LLM
     client = get_llm_client()
@@ -193,6 +259,10 @@ def build_morning_briefing() -> dict:
             "jira": jira_data,
             "github": github_data,
             "infra": infra_data,
+            "slack": slack_data,
+            "calendar": calendar_data,
+            "gmail": gmail_data,
+            "reminders": reminders,
         },
     }
 
@@ -320,7 +390,11 @@ def build_pr_digest() -> dict:
 
 # ── Formatting Helpers ──────────────────────────────────────────
 
-def _format_raw_context(jira_data: dict, github_data: dict, infra_data: dict) -> str:
+def _format_raw_context(
+    jira_data: dict, github_data: dict, infra_data: dict,
+    slack_data: dict | None = None, calendar_data: dict | None = None,
+    gmail_data: dict | None = None, reminders: list | None = None,
+) -> str:
     """Format collected raw data into a text context for LLM."""
     parts: list[str] = []
 
@@ -426,5 +500,67 @@ def _format_raw_context(jira_data: dict, github_data: dict, infra_data: dict) ->
         for agent_id, data in infra_data.items():
             parts.append(f"\n### {agent_id}")
             parts.append(str(data))
+
+    # Calendar section
+    if calendar_data:
+        cal = calendar_data.get("calendar", {})
+        if isinstance(cal, dict) and "error" not in cal:
+            events = cal.get("events", [])
+            if events:
+                parts.append("\n\n## TODAY'S CALENDAR")
+                for e in events:
+                    start = e.get("start_time", "")
+                    summary = e.get("summary", "No title")
+                    location = e.get("location", "")
+                    link = e.get("hangout_link", "")
+                    line = f"- {start[:16]} — {summary}"
+                    if location:
+                        line += f" ({location})"
+                    if link:
+                        line += f" [link]"
+                    parts.append(line)
+
+    # Slack section
+    if slack_data:
+        parts.append("\n\n## SLACK HIGHLIGHTS")
+        for agent_id, data in slack_data.items():
+            if isinstance(data, dict) and "error" not in data:
+                mentions = data.get("mentions", [])
+                dms = data.get("direct_messages", [])
+                summary = data.get("summary", {})
+
+                if mentions:
+                    parts.append(f"\nMentions ({len(mentions)}):")
+                    for m in mentions[:8]:
+                        parts.append(f"- #{m.get('channel', '?')} — {m.get('author', '?')}: \"{m.get('text', '')[:100]}\"")
+
+                if dms:
+                    parts.append(f"\nDirect Messages ({len(dms)}):")
+                    for d in dms[:5]:
+                        parts.append(f"- {d.get('author', '?')}: \"{d.get('text', '')[:100]}\"")
+
+    # Gmail section
+    if gmail_data:
+        gmail = gmail_data.get("gmail", {})
+        if isinstance(gmail, dict) and "error" not in gmail:
+            emails = gmail.get("emails", [])
+            if emails:
+                parts.append(f"\n\n## EMAILS NEEDING ACTION ({len(emails)})")
+                for e in emails[:8]:
+                    parts.append(f"- From: {e.get('from', '?')} — {e.get('subject', 'No subject')}")
+                    snippet = e.get("snippet", "")
+                    if snippet:
+                        parts.append(f"  Preview: \"{snippet[:100]}\"")
+
+    # Reminders section
+    if reminders:
+        parts.append(f"\n\n## DUE REMINDERS ({len(reminders)})")
+        for r in reminders:
+            line = f"- {r.get('title', '?')}"
+            if r.get("due_at"):
+                line += f" (due: {r['due_at']})"
+            if r.get("priority") and r["priority"] != "normal":
+                line += f" [{r['priority']}]"
+            parts.append(line)
 
     return "\n".join(parts)

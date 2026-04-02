@@ -25,6 +25,10 @@ sys.path.insert(0, "/app")
 from shared.agent_client import AgentClient, AgentRegistry
 from shared.auth import verify_dashboard_pin
 from shared.models import QueryResponse
+from shared.reminder_store import (
+    add_reminder, list_reminders, get_due_reminders,
+    complete_reminder, snooze_reminder, delete_reminder,
+)
 
 from scheduler import Scheduler
 
@@ -123,6 +127,18 @@ class PinAuth(BaseModel):
     pin: str
 
 
+class ReminderCreate(BaseModel):
+    title: str
+    body: str = ""
+    profile_id: str = ""
+    due_at: str | None = None
+    priority: str = "normal"
+
+
+class ReminderAction(BaseModel):
+    hours: int = 1
+
+
 # ── Dashboard Auth ───────────────────────────────────────────────
 
 @app.post("/auth/verify")
@@ -216,6 +232,27 @@ def _route_query(query: str, profile_id: str = "") -> dict[str, list[str]]:
         planner = registry.get("planner")
         if planner:
             targets["planner"] = ["planner"]
+
+    # Slack queries
+    slack_keywords = ["slack", "mention", "dm", "channel", "message", "thread"]
+    if any(kw in q for kw in slack_keywords):
+        slack_agents = registry.get_by_type("slack")
+        if slack_agents:
+            targets["slack"] = [aid for aid, _ in slack_agents]
+
+    # Calendar queries
+    calendar_keywords = ["calendar", "meeting", "schedule", "event", "free slot", "busy", "appointment"]
+    if any(kw in q for kw in calendar_keywords):
+        cal = registry.get("calendar")
+        if cal:
+            targets["calendar"] = ["calendar"]
+
+    # Email queries
+    gmail_keywords = ["email", "mail", "gmail", "inbox", "unread"]
+    if any(kw in q for kw in gmail_keywords):
+        gmail = registry.get("gmail")
+        if gmail:
+            targets["gmail"] = ["gmail"]
 
     # Research queries
     research_keywords = ["research", "look up", "find out", "best practice", "how to"]
@@ -339,6 +376,50 @@ def get_notifications(profile_id: str = Query(default="")):
             all_notifs[agent_id] = result
 
     return {"status": "ok", "data": all_notifs}
+
+
+# ── Reminders ────────────────────────────────────────────────────
+
+@app.get("/reminders")
+def get_reminders(profile_id: str = Query(default=""), include_completed: bool = Query(default=False)):
+    """List active reminders."""
+    items = list_reminders(profile_id=profile_id, include_completed=include_completed)
+    return {"status": "ok", "reminders": items}
+
+
+@app.get("/reminders/due")
+def due_reminders(profile_id: str = Query(default="")):
+    """Get reminders that are due now or overdue."""
+    items = get_due_reminders(profile_id=profile_id)
+    return {"status": "ok", "reminders": items}
+
+
+@app.post("/reminders")
+def create_reminder(req: ReminderCreate):
+    """Create a new reminder."""
+    result = add_reminder(
+        title=req.title, body=req.body, profile_id=req.profile_id,
+        due_at=req.due_at, priority=req.priority,
+    )
+    return {"status": "ok", **result}
+
+
+@app.post("/reminders/{reminder_id}/complete")
+def mark_complete(reminder_id: int):
+    """Mark a reminder as done."""
+    return {"status": "ok", **complete_reminder(reminder_id)}
+
+
+@app.post("/reminders/{reminder_id}/snooze")
+def snooze(reminder_id: int, req: ReminderAction):
+    """Snooze a reminder for N hours."""
+    return {"status": "ok", **snooze_reminder(reminder_id, hours=req.hours)}
+
+
+@app.delete("/reminders/{reminder_id}")
+def remove_reminder(reminder_id: int):
+    """Delete a reminder."""
+    return {"status": "ok", **delete_reminder(reminder_id)}
 
 
 def _aggregate_blockers(profile_id: str = "") -> dict:

@@ -7,6 +7,7 @@ import PRDigest from "./components/PRDigest";
 import TicketSummary from "./components/TicketSummary";
 import BlockerAlerts from "./components/BlockerAlerts";
 import ActivityFeed from "./components/ActivityFeed";
+import Reminders from "./components/Reminders";
 import AgentHealth from "./components/AgentHealth";
 import QueryBar from "./components/QueryBar";
 import "./App.css";
@@ -56,6 +57,7 @@ export default function App() {
             <TicketList profileId={activeProfile} />
           </div>
           <div className="grid-col-side">
+            <Reminders profileId={activeProfile} />
             <BlockerAlerts profileId={activeProfile} />
             <TicketSummary profileId={activeProfile} />
             <PRDigest profileId={activeProfile} />

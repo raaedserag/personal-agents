@@ -1,0 +1,19 @@
+spec_version: "0.2.0"
+name: nerve-slack-agent
+version: 1.0.0
+description: >
+  Read-only Slack agent for the Nerve Center platform.
+  Surfaces mentions, DMs, and channel highlights.
+
+model:
+  default:
+    provider: ollama
+    name: llama3.2
+    base_url: http://host.docker.internal:11434
+
+skills:
+  - slack_fetcher
+
+secrets:
+  - SLACK_USER_TOKEN
+  - AGENT_API_KEY

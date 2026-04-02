@@ -357,6 +357,59 @@ body {
 }
 .activity-project { font-size: 11px; color: var(--text-muted); }
 
+/* ── Reminders ──────────────────────────────────────────────── */
+.reminder-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.reminder-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+.reminder-input:focus { outline: none; border-color: var(--accent); }
+.reminder-date { font-size: 12px; }
+.reminder-add-actions { display: flex; gap: 6px; }
+.btn-ghost { background: transparent; color: var(--text-muted); }
+
+.reminder-list { display: flex; flex-direction: column; }
+
+.reminder-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+.reminder-item:last-child { border-bottom: none; }
+.reminder-item.high { border-left: 3px solid var(--danger); padding-left: 8px; }
+
+.reminder-content { flex: 1; min-width: 0; }
+.reminder-title { font-size: 13px; display: block; }
+.reminder-due { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 3px; margin-top: 2px; }
+
+.reminder-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.btn-icon-xs {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+}
+.btn-icon-xs:hover { color: var(--text); border-color: var(--text-muted); }
+.btn-icon-xs.done:hover { color: var(--success); border-color: var(--success); }
+
 /* ── Jira Summary Panel ─────────────────────────────────────── */
 .ticket-key-badge {
   font-size: 12px;

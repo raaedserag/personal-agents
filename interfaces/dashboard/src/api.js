@@ -47,6 +47,15 @@ export const sendQuery = (query, profileId) =>
 // Context
 export const switchContext = (profileId) => request("GET", `/context/${profileId}`);
 
+// Reminders
+export const getReminders = (profileId) =>
+  request("GET", "/reminders", { params: profileId ? { profile_id: profileId } : {} });
+export const createReminder = (title, body, profileId, dueAt, priority) =>
+  request("POST", "/reminders", { body: { title, body, profile_id: profileId || "", due_at: dueAt || null, priority: priority || "normal" } });
+export const completeReminder = (id) => request("POST", `/reminders/${id}/complete`);
+export const snoozeReminder = (id, hours) => request("POST", `/reminders/${id}/snooze`, { body: { hours } });
+export const deleteReminder = (id) => request("DELETE", `/reminders/${id}`);
+
 // Scheduler
 export const getSchedulerStatus = () => request("GET", "/scheduler/status");
 export const triggerSchedule = (name) => request("POST", `/scheduler/trigger/${name}`);

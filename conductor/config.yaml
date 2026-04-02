@@ -11,6 +11,32 @@ agents:
     url: http://github-yassir:8000
     port: 20011
 
+  - id: planner
+    type: planner
+    profile: global
+    url: http://planner:8000
+    port: 20020
+
+  # ── New agents (uncomment when credentials are ready) ──
+
+  - id: slack-yassir
+    type: slack
+    profile: yassir
+    url: http://slack-yassir:8000
+    port: 20050
+
+  - id: calendar
+    type: calendar
+    profile: global
+    url: http://calendar:8000
+    port: 20060
+
+  - id: gmail
+    type: gmail
+    profile: global
+    url: http://gmail:8000
+    port: 20070
+
   # Uncomment as you add more agents:
   # - id: jira-zeal
   #   type: jira
@@ -24,12 +50,6 @@ agents:
   #   url: http://github-zeal:8000
   #   port: 20010
   #
-  - id: planner
-    type: planner
-    profile: global
-    url: http://planner:8000
-    port: 20020
-
   # - id: infra-zeal
   #   type: infra
   #   profile: zeal
